@@ -815,7 +815,9 @@ extension PlayerView {
             )
         }
         // Follow the window shape for the landscape layout.
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
             containerSize = size
             syncLandscapeLayout(reason: "containerSize \(Int(size.width))x\(Int(size.height))")
         }

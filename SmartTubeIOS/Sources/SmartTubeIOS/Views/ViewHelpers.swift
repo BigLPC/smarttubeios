@@ -75,7 +75,11 @@ struct VideoGrid<Content: View>: View {
         let count = videoGridColumnCount(store.settings, landscape: isLandscapeLayout, width: width)
         LazyVGrid(columns: videoGridColumns(count: count), spacing: videoGridRowSpacing, content: content)
             .id("\(resetToken?.uuidString ?? "")-\(count)")
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { newWidth in
+                width = newWidth
+            }
     }
 }
 #endif

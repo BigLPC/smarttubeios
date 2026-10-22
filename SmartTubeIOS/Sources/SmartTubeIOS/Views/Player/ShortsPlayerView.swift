@@ -117,7 +117,11 @@ public struct ShortsPlayerView: View {
                     }
                 }
                 .ignoresSafeArea()
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { containerHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { newHeight in
+                    containerHeight = newHeight
+                }
                 #else
                 if ProcessInfo.processInfo.arguments.contains("--uitesting") {
                     Color.black.ignoresSafeArea()
