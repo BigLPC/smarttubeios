@@ -16,11 +16,7 @@ extension ShortsPlayerView {
     /// runs `action` to switch to the new video, then slides the new content in
     /// from the opposite side.
     func performVerticalTransition(direction: CGFloat, action: @escaping () -> Void) {
-        #if os(iOS)
-        let screenHeight = UIScreen.main.bounds.height
-        #else
-        let screenHeight: CGFloat = 800
-        #endif
+        let screenHeight = containerHeight
         isTransitioning = true
         withAnimation(.easeIn(duration: 0.2)) {
             slideOffset = direction * screenHeight

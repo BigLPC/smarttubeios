@@ -580,6 +580,19 @@ extension PlayerView {
     }
     #endif
 
+    #if os(iOS)
+    /// Single source of truth for `vm.isLandscape`: the lock button, the
+    /// "Landscape Always Play" setting, or a window that is wider than tall.
+    func syncLandscapeLayout(reason: String) {
+        let newIsLandscape = isLandscapeLocked || store.settings.landscapeAlwaysPlay || isWindowWide
+        guard vm.isLandscape != newIsLandscape else { return }
+        swipeLog.notice(
+            "[orientation] \(reason) — isLandscape: \(vm.isLandscape) → \(newIsLandscape) (locked=\(isLandscapeLocked) windowWide=\(isWindowWide))"
+        )
+        vm.isLandscape = newIsLandscape
+    }
+    #endif
+
     var bodyWithLifecycleModifiers: some View {
         // Group branches by platform so each branch has its own type-inference scope.
         // Platform-specific toolbar and nav-bar modifiers live inside each branch to
@@ -619,30 +632,8 @@ extension PlayerView {
             UIAccessibility.post(notification: .screenChanged, argument: nil)
             swipeLog.notice("[orientation] onAppear — calling beginGeneratingDeviceOrientationNotifications")
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-            let rawOrientation = UIDevice.current.orientation
-            let physicallyLandscape: Bool
-            if rawOrientation.isLandscape || rawOrientation.isPortrait {
-                // OS has delivered a definitive device orientation.
-                physicallyLandscape = rawOrientation.isLandscape
-            } else {
-                // rawOrientation is .unknown, .faceUp, or .faceDown — OS has not yet
-                // delivered the first orientation notification. Fall back to the window
-                // scene's interface orientation, which is always valid (it reflects the
-                // status-bar orientation rather than the physical device sensor).
-                let windowScene = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .first
-                physicallyLandscape = windowScene?.interfaceOrientation.isLandscape ?? false
-                swipeLog.notice(
-                    "[orientation] onAppear — rawOrientation=\(rawOrientation.rawValue) is ambiguous; using windowScene interfaceOrientation=\(windowScene?.interfaceOrientation.rawValue ?? -1)"
-                )
-            }
             let alwaysPlayOnAppear = store.settings.landscapeAlwaysPlay
-            let isLandscapeOnAppear = alwaysPlayOnAppear || physicallyLandscape
-            vm.isLandscape = isLandscapeOnAppear
-            swipeLog.notice(
-                "[orientation] onAppear — rawOrientation=\(rawOrientation.rawValue) physicallyLandscape=\(physicallyLandscape) landscapeAlwaysPlay=\(alwaysPlayOnAppear) → isLandscape=\(isLandscapeOnAppear)"
-            )
+            syncLandscapeLayout(reason: "onAppear")
             if alwaysPlayOnAppear {
                 swipeLog.notice("[orientation] onAppear — landscapeAlwaysPlay=true, setting playerIsActive=true")
                 OrientationManager.shared.playerIsActive = true
@@ -810,44 +801,34 @@ extension PlayerView {
                 )
                 return
             }
+            // Physical rotation only decides whether the window may rotate to
+            // landscape. The layout itself follows the window shape (see
+            // syncLandscapeLayout), which also changes without rotation on
+            // iPhone Duo or in Split View.
             let alwaysLandscape = store.settings.landscapeAlwaysPlay
             let physicalLandscape = orientation.isLandscape
-            let newIsLandscape = isLandscapeLocked || alwaysLandscape || physicalLandscape
-            let prevIsLandscape = vm.isLandscape
+            let allowLandscape = isLandscapeLocked || alwaysLandscape || physicalLandscape
             let prevPlayerIsActive = OrientationManager.shared.playerIsActive
-            vm.isLandscape = newIsLandscape
-            OrientationManager.shared.playerIsActive = newIsLandscape
+            OrientationManager.shared.playerIsActive = allowLandscape
             swipeLog.notice(
-                "[orientation] orientationDidChange — landscapeLocked=\(isLandscapeLocked) landscapeAlwaysPlay=\(alwaysLandscape) physicalLandscape=\(physicalLandscape) isLandscape: \(prevIsLandscape) → \(newIsLandscape) playerIsActive: \(prevPlayerIsActive) → \(newIsLandscape)"
+                "[orientation] orientationDidChange — landscapeLocked=\(isLandscapeLocked) landscapeAlwaysPlay=\(alwaysLandscape) physicalLandscape=\(physicalLandscape) playerIsActive: \(prevPlayerIsActive) → \(allowLandscape)"
             )
+        }
+        // Follow the window shape for the landscape layout.
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            containerSize = size
+            syncLandscapeLayout(reason: "containerSize \(Int(size.width))x\(Int(size.height))")
         }
         // Keep isLandscape in sync when the user toggles "Landscape Always Play" while
         // the player is on screen.
         .onChange(of: store.settings.landscapeAlwaysPlay) { oldValue, alwaysLandscape in
-            let rawOrientation = UIDevice.current.orientation
-            let physicallyLandscape = rawOrientation.isLandscape
-            let newIsLandscape = isLandscapeLocked || alwaysLandscape || physicallyLandscape
-            let prevIsLandscape = vm.isLandscape
-            let prevPlayerIsActive = OrientationManager.shared.playerIsActive
-            vm.isLandscape = newIsLandscape
             OrientationManager.shared.playerIsActive = isLandscapeLocked || alwaysLandscape
-            swipeLog.notice(
-                "[orientation] landscapeAlwaysPlay: \(oldValue) → \(alwaysLandscape) landscapeLocked=\(isLandscapeLocked) rawOrientation=\(rawOrientation.rawValue) physicallyLandscape=\(physicallyLandscape) isLandscape: \(prevIsLandscape) → \(newIsLandscape) playerIsActive: \(prevPlayerIsActive) → \(isLandscapeLocked || alwaysLandscape)"
-            )
+            syncLandscapeLayout(reason: "landscapeAlwaysPlay \(oldValue) → \(alwaysLandscape)")
         }
         // Apply orientation immediately when the lock button is tapped.
         .onChange(of: isLandscapeLocked) { oldValue, isLocked in
-            let rawOrientation = UIDevice.current.orientation
-            let physicallyLandscape = rawOrientation.isLandscape
-            let alwaysLandscape = store.settings.landscapeAlwaysPlay
-            let newIsLandscape = isLocked || alwaysLandscape || physicallyLandscape
-            let prevIsLandscape = vm.isLandscape
-            let prevPlayerIsActive = OrientationManager.shared.playerIsActive
-            vm.isLandscape = newIsLandscape
-            OrientationManager.shared.playerIsActive = isLocked || alwaysLandscape
-            swipeLog.notice(
-                "[orientation] landscapeLocked: \(oldValue) → \(isLocked) alwaysLandscape=\(alwaysLandscape) physicallyLandscape=\(physicallyLandscape) isLandscape: \(prevIsLandscape) → \(newIsLandscape) playerIsActive: \(prevPlayerIsActive) → \(isLocked || alwaysLandscape)"
-            )
+            OrientationManager.shared.playerIsActive = isLocked || store.settings.landscapeAlwaysPlay
+            syncLandscapeLayout(reason: "landscapeLocked \(oldValue) → \(isLocked)")
         }
         #endif
         .navigationDestination(item: $channelDestination) { dest in

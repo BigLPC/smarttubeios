@@ -91,8 +91,8 @@ struct SwipeGestureOverlay: UIViewRepresentable {
         }
 
         @MainActor @objc func handleTap(_ gr: UITapGestureRecognizer) {
-            // location(in: nil) returns window coordinates, same space as
-            // UIScreen.main.bounds — used by the caller to distinguish tap zones.
+            // location(in: nil) returns window coordinates — the caller compares
+            // against the player's full-bleed height to distinguish tap zones.
             parent.onTap(gr.location(in: nil))
         }
         @MainActor @objc func handleTwoFingerTap() { parent.onTwoFingerTap() }

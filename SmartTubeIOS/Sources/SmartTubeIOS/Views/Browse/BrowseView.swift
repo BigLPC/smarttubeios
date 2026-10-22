@@ -200,7 +200,6 @@ struct VideoGridSection: View {
 
     @Environment(SettingsStore.self) private var store
     #if !os(tvOS)
-    @Environment(\.isLandscapeLayout) private var isLandscapeLayout
     /// Rotated on every UIDevice orientation change so `.id(orientationToken)` forces
     /// SwiftUI to fully recreate the LazyVGrid, preventing hit-test/layout mismatches
     /// after rotation on iPad (GitHub issue #82 — wrong video tapped in landscape).
@@ -272,9 +271,7 @@ struct VideoGridSection: View {
             .focusSection()
             #endif
             #else
-            LazyVGrid(
-                columns: videoGridColumns(store.settings, landscape: isLandscapeLayout), spacing: videoGridRowSpacing
-            ) {
+            VideoGrid(resetToken: orientationToken) {
                 ForEach(videos) { video in
                     VideoCardView(video: video, compact: false)
                         .accessibilityIdentifier("video.card.\(video.id)")
@@ -285,11 +282,9 @@ struct VideoGridSection: View {
                         }
                 }
             }
-            // Column count now follows isLandscapeLayout (set by a later layout pass than the
-            // orientation notification, and also on iPad split-screen resizes), so reset the
-            // grid's identity on that too — a column change without an identity reset is the
-            // wrong-video-tapped-after-rotation bug (#82).
-            .id("\(orientationToken)-\(isLandscapeLayout)")
+            // VideoGrid resets its own identity whenever the column count changes
+            // (window resize, rotation, folding/unfolding); orientationToken adds a
+            // reset on every device rotation too (#82).
             .padding(.horizontal)
             .padding(.vertical, 8)
             #if canImport(UIKit)

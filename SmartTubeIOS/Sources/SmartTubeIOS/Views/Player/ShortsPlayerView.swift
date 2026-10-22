@@ -47,6 +47,10 @@ public struct ShortsPlayerView: View {
     /// True while the app is backgrounded — guards onDisappear from calling stop()
     /// when iOS fires it as a side-effect of backgrounding rather than navigation.
     @State var isInBackground = false
+    /// Full-bleed height of the player area, tracked from layout rather than
+    /// `UIScreen.main` so paging and tap zones stay correct when the window
+    /// resizes (Split View, Stage Manager, folding/unfolding iPhone Duo).
+    @State var containerHeight: CGFloat = 800
     let api: InnerTubeAPI
 
     public init(videos: [Video], startIndex: Int = 0, api: InnerTubeAPI) {
@@ -113,6 +117,7 @@ public struct ShortsPlayerView: View {
                     }
                 }
                 .ignoresSafeArea()
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { containerHeight = $0 }
                 #else
                 if ProcessInfo.processInfo.arguments.contains("--uitesting") {
                     Color.black.ignoresSafeArea()
@@ -162,8 +167,7 @@ public struct ShortsPlayerView: View {
                         // controls bar at the bottom of the 9:16 embed). Taps there are
                         // passed through to WKWebView when paused so native controls work.
                         // Taps anywhere above that: toggle play/pause regardless of state.
-                        let screenH = UIScreen.main.bounds.height
-                        let inNativeControlsArea = point.y / screenH > 0.88
+                        let inNativeControlsArea = point.y / max(containerHeight, 1) > 0.88
                         if vm.playerState == .paused && inNativeControlsArea { return }
                         vm.togglePlayPause()
                     },
