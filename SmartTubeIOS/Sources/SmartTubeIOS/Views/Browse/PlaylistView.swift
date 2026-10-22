@@ -14,7 +14,6 @@ public struct PlaylistView: View {
     @Environment(SettingsStore.self) private var store
     @Environment(\.innerTubeAPI) private var api
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.isLandscapeLayout) private var isLandscapeLayout
     @State private var vm: PlaylistViewModel
     @State private var selectedVideo: Video?
     @State private var channelDestination: ChannelDestination?
@@ -181,10 +180,7 @@ public struct PlaylistView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 #else
-                LazyVGrid(
-                    columns: videoGridColumns(store.settings, landscape: isLandscapeLayout),
-                    spacing: videoGridRowSpacing
-                ) {
+                VideoGrid {
                     ForEach(displayVideos) { video in
                         VideoCardView(video: video, compact: false, currentPlaylistId: playlistId)
                             .accessibilityIdentifier("video.card.\(video.id)")
@@ -211,7 +207,6 @@ public struct PlaylistView: View {
                             .onAppear { vm.loadMoreIfNeeded(lastVideo: video) }
                     }
                 }
-                .id(isLandscapeLayout)  // reset on column-count change — see VideoGridSection (#82)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 #endif

@@ -36,10 +36,51 @@ let videoGridRowSpacing: CGFloat = 40
 #else
 let videoGridRowSpacing: CGFloat = 12
 
+/// Narrowest a grid card may get before wide containers add another column.
+let videoGridMinimumCardWidth: CGFloat = 300
+
+/// The user's portrait/landscape column setting is the minimum; wide containers
+/// (iPad, iPhone Duo inner display, large Split View panes) add columns so cards
+/// keep a sensible size instead of stretching.
+func videoGridColumnCount(_ settings: AppSettings, landscape: Bool, width: CGFloat) -> Int {
+    let preferred = landscape ? settings.gridColumnsLandscape : settings.gridColumnsPortrait
+    guard width > 0 else { return preferred }
+    let fitting = Int((width + videoGridRowSpacing) / (videoGridMinimumCardWidth + videoGridRowSpacing))
+    return max(preferred, fitting)
+}
+
 /// Fixed (not adaptive) columns avoid the rotation hit-test mismatch of issue #82.
-func videoGridColumns(_ settings: AppSettings, landscape: Bool) -> [GridItem] {
-    let count = landscape ? settings.gridColumnsLandscape : settings.gridColumnsPortrait
-    return Array(repeating: GridItem(.flexible(), spacing: videoGridRowSpacing), count: count)
+func videoGridColumns(count: Int) -> [GridItem] {
+    Array(repeating: GridItem(.flexible(), spacing: videoGridRowSpacing), count: count)
+}
+
+/// `LazyVGrid` of video cards whose column count follows the container width
+/// (see `videoGridColumnCount`). Columns stay fixed `.flexible` items and the
+/// grid's identity resets on every column-count change — a column change
+/// without an identity reset is the wrong-video-tapped bug (#82).
+struct VideoGrid<Content: View>: View {
+    @Environment(SettingsStore.self) private var store
+    @Environment(\.isLandscapeLayout) private var isLandscapeLayout
+    @State private var width: CGFloat = 0
+    /// Extra identity component; change it to force a grid rebuild.
+    let resetToken: UUID?
+    let content: () -> Content
+
+    init(resetToken: UUID? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.resetToken = resetToken
+        self.content = content
+    }
+
+    var body: some View {
+        let count = videoGridColumnCount(store.settings, landscape: isLandscapeLayout, width: width)
+        LazyVGrid(columns: videoGridColumns(count: count), spacing: videoGridRowSpacing, content: content)
+            .id("\(resetToken?.uuidString ?? "")-\(count)")
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { newWidth in
+                width = newWidth
+            }
+    }
 }
 #endif
 

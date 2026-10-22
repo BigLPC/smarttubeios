@@ -52,6 +52,12 @@ public struct PlayerView: View {
     @State var pipDelegate: PiPDelegate?
     @State var isPiPActive: Bool = false
     @State var isLandscapeLocked = false
+    /// Size of the player's container, tracked from layout. Drives the landscape
+    /// layout and menu sizing instead of `UIDevice.current.orientation` /
+    /// `UIScreen.main`, because the window can change shape without the device
+    /// rotating (Split View, Stage Manager, folding or unfolding iPhone Duo).
+    @State var containerSize: CGSize = .zero
+    var isWindowWide: Bool { containerSize.width > containerSize.height }
     var playerLayer: AVPlayerLayer { playerState.playerHostView.playerLayer }
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.verticalSizeClass) var verticalSizeClass
